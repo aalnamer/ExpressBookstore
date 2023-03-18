@@ -1,8 +1,10 @@
 const express = require("express");
 const Book = require("../models/book");
-
 const router = new express.Router();
-
+const jsonschema = require("jsonschema");
+const bookSchema = require("../schemas/bookSchema.json");
+const updateBookSchema = require("../schemas/updateBookSchema.json");
+const ExpressError = require("../expressError");
 
 /** GET / => {books: [book, ...]}  */
 
@@ -30,7 +32,15 @@ router.get("/:id", async function (req, res, next) {
 
 router.post("/", async function (req, res, next) {
   try {
+    const result = jsonschema.validate(req.body, bookSchema);
+    console.log(req.body);
+    if (!result.valid) {
+      const listOfErrors = result.errors.map((e) => e.stack);
+      const err = new ExpressError(listOfErrors, 400);
+      return next(err);
+    }
     const book = await Book.create(req.body);
+    console.log(book);
     return res.status(201).json({ book });
   } catch (err) {
     return next(err);
@@ -41,6 +51,18 @@ router.post("/", async function (req, res, next) {
 
 router.put("/:isbn", async function (req, res, next) {
   try {
+    if ("isbn" in req.body) {
+      return next({
+        status: 400,
+        message: "Cannot Change ISBN",
+      });
+    }
+    const result = jsonschema.validate(req.body, updateBookSchema);
+    if (!result.valid) {
+      const listOfErrors = result.errors.map((e) => e.stack);
+      const err = new ExpressError(listOfErrors, 400);
+      return next(err);
+    }
     const book = await Book.update(req.params.isbn, req.body);
     return res.json({ book });
   } catch (err) {
